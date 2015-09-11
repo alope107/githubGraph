@@ -2,8 +2,16 @@
 <meta charset="utf-8">
 <style>
 
-.link {
+/* Style for inter-repo links */
+.link1 {
+  stroke: white;
+  stroke-width: 1;
+}
+
+/* Style for repo-contributor links */
+.link2 {
   stroke: #e6e6e6;
+  stroke-width: 2;
 }
 
 .node text {
@@ -17,19 +25,34 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/3.5.5/d3.min.js"></script>
 <script>
 
+//basic tuning parameters
 var width = 960,
     height = 500,
     radius = 15,
-    distance = 160;
+    distance = 60,
+    gravity = .09,
+    charge = -550;
+
+//scale for icon classes
+var scale = new Array();
+scale["contributor"] = 1;
+scale["repo"] = 2;
+scale["center"] = 3.5;
+
+//Whether to show label
+var showLabel = new Array();
+showLabel["contributor"] = true;
+showLabel["repo"] = true;
+showLabel["center"] = false;
 
 var svg = d3.select("body").append("svg")
     .attr("width", width)
     .attr("height", height);
 
 var force = d3.layout.force()
-    .gravity(.05)
-    .distance(distance)
-    .charge(-100)
+    .gravity(gravity)
+    .distance(function (d) {return d.value * distance})
+    .charge(charge)
     .size([width, height]);
 
 d3.json("graphData.json", function(error, json) {
@@ -43,7 +66,7 @@ d3.json("graphData.json", function(error, json) {
   var link = svg.selectAll(".link")
       .data(json.links)
     .enter().append("line")
-      .attr("class", "link");
+      .attr("class", function(d) {return "link" + d.value});
 
   var node = svg.selectAll(".node")
       .data(json.nodes)
@@ -51,23 +74,36 @@ d3.json("graphData.json", function(error, json) {
       .attr("class", "node")
       .call(force.drag);
 
-  var clip = svg.append("clipPath")
-    .attr("id", "clipCircle")
+  svg.append("clipPath")
+    .attr("id", "clipCircle-contributor")
     .append("circle")
-      .attr("r", radius);
+      .attr("r", radius * scale["contributor"]);
+
+  //uncomment to enable circle clipping for repo icons
+  /*
+  svg.append("clipPath")
+    .attr("id", "clipCircle-repo")
+    .append("circle")
+      .attr("r", radius * scale["repo"]);
+
+  svg.append("clipPath")
+    .attr("id", "clipCircle-center")
+    .append("circle")
+      .attr("r", radius * scale["center"]);
+  */
 
   node.append("svg:image")
       .attr("xlink:href", function(d) {return d.image;})
-      .attr("x", -radius)
-      .attr("y", -radius)
-      .attr("width", radius * 2)
-      .attr("height", radius * 2)
-      .attr("clip-path", "url(#clipCircle)");
+      .attr("x", function(d) {return -radius * scale[d.type]})
+      .attr("y", function(d) {return -radius * scale[d.type]})
+      .attr("width", function(d) {return radius * 2 * scale[d.type]})
+      .attr("height", function(d) {return radius * 2 * scale[d.type]})
+      .attr("clip-path", function(d) {return "url(#clipCircle-" + d.type + ")" });
 
   node.append("text")
       .attr("dx", 20)
       .attr("dy", ".35em")
-      .text(function(d) { return d.name });
+      .text(function(d) { return (showLabel[d.type]) ? d.name : ""});
 
   force.on("tick", function() {
     node.attr("cx", function(d) { return d.x = Math.max(radius, Math.min(width - radius, d.x)); })
